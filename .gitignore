@@ -1,0 +1,20 @@
+# Xcode
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+project.xcworkspace/xcuserdata/
+
+# Environment & Secrets
+PracticeRoom/Config/Environment.swift
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# macOS
+.DS_Store
+
+# Other
+*.swp
+*~.nib
+DerivedData/
