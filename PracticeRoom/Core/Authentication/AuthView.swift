@@ -6,20 +6,15 @@
 //
 
 import SwiftUI
-import Supabase
 
 struct AuthView: View {
-    @State private var email = ""
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-    @State private var successMessage: String?
+    @StateObject private var viewModel = AuthViewModel()
     
     var body: some View {
         ZStack {
             Color(.systemBackground).ignoresSafeArea()
             
             VStack(spacing: 24) {
-                Spacer()
                 
                 // App Title
                 VStack(spacing: 8) {
@@ -35,7 +30,7 @@ struct AuthView: View {
                 
                 // Email Input
                 VStack(alignment: .leading, spacing: 8) {
-                    TextField("Email", text: $email)
+                    TextField("Email", text: $viewModel.email)
                         .textContentType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -44,7 +39,8 @@ struct AuthView: View {
                         .background(Color(.systemGray6))
                         .cornerRadius(10)
                     
-                    if !email.isEmpty && !isValidEmail(email) {
+                    // email field required, valid email required
+                    if !viewModel.email.isEmpty && !isValidEmail(viewModel.email) {
                         Text("Please enter a valid email address")
                             .font(.caption)
                             .foregroundStyle(.orange)
@@ -52,8 +48,12 @@ struct AuthView: View {
                 }
                 
                 // Sign In Button
-                Button(action: sendMagicLink) {
-                    if isLoading {
+                Button(action: {
+                    Task {
+                        await viewModel.signInWithMagicLink(email: viewModel.email)
+                    }
+                }) {
+                    if viewModel.isLoading {
                         ProgressView()
                             .tint(.white)
                     } else {
@@ -63,13 +63,13 @@ struct AuthView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(isValidEmail(email) && !email.isEmpty ? Color.blue : Color.gray)
+                .background(isValidEmail(viewModel.email) && !viewModel.email.isEmpty ? Color.blue : Color.gray)
                 .foregroundColor(.white)
                 .cornerRadius(10)
-                .disabled(!isValidEmail(email) || email.isEmpty || isLoading)
+                .disabled(!isValidEmail(viewModel.email) || viewModel.email.isEmpty || viewModel.isLoading) // TODO: isLoading might be why bugging when you press button
                 
-                // Success/Error Messages
-                if let successMessage {
+                // Success message
+                if let successMessage = viewModel.successMessage {
                     HStack(spacing: 8) {
                         Image(systemName: "envelope.circle.fill")
                             .foregroundColor(.green)
@@ -80,9 +80,11 @@ struct AuthView: View {
                     .padding()
                     .background(Color.green.opacity(0.1))
                     .cornerRadius(10)
+                    
                 }
                 
-                if let errorMessage {
+                // Error message
+                if let errorMessage = viewModel.errorMessage {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.red)
@@ -95,59 +97,19 @@ struct AuthView: View {
                     .cornerRadius(10)
                 }
                 
-                Spacer()
-                Spacer()
-                
-                // Info Text
-                Text("We'll send you a magic link to sign in.\nNo password needed!")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.bottom, 30)
             }
-            .padding(.horizontal, 24)
         }
         .onOpenURL(perform: { url in
             Task {
-                do {
-                    try await supabase.auth.session(from: url)
-                    successMessage = "Successfully signed in!"
-                } catch {
-                    errorMessage = "Failed to sign in. Please try again."
-                }
+                await viewModel.handleMagicLinkCallback(url: url) // Perform sign in with magic link
             }
         })
     }
     
-    // MARK: - Actions
-    func sendMagicLink() {
-        Task {
-            isLoading = true
-            errorMessage = nil
-            successMessage = nil
-            defer { isLoading = false }
-            
-            do {
-                try await supabase.auth.signInWithOTP(
-                    email: email,
-                    redirectTo: URL(string: "practiceroom://login-callback")
-                )
-                successMessage = "Check your email! We sent you a magic link to sign in."
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-    
-    // MARK: - Validation
+    // Validate email input
     func isValidEmail(_ email: String) -> Bool {
         let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
         let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
         return emailPredicate.evaluate(with: email)
     }
-}
-
-
-#Preview {
-    AuthView()
 }
