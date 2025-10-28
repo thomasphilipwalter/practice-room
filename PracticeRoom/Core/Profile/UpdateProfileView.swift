@@ -82,6 +82,24 @@ struct UpdateProfileView: View {
                     .autocorrectionDisabled()
             }
             Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextEditor(text: $viewModel.bio)
+                        .frame(height: 100)
+                    
+                    Text("\(viewModel.bio.count)/200 characters")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .onChange(of: viewModel.bio) { newValue in
+                    if newValue.count > 200 {
+                        viewModel.bio = String(newValue.prefix(200))
+                    }
+                }
+            } header: {
+                Text("Bio (Optional)")
+            }
+            Section {
                 Button("Save changes") {
                     Task {
                         await viewModel.updateProfile(userId: userId)

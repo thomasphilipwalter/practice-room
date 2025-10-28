@@ -42,7 +42,7 @@ struct FriendsFeedView: View {
                 }
                 .padding()
             } else {
-                VerticalVideoFeedView(videos: viewModel.videos)
+                VerticalVideoFeedView(videos: viewModel.videos, isSearchShowing: showSearchView)
                     .allowsHitTesting(true)  // Allow touches on video
             }
             

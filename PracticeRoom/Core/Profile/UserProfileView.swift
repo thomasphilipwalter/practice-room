@@ -37,16 +37,35 @@ struct UserProfileView: View {
         ScrollView {
             VStack(spacing: 20) {
                 HStack(spacing: 16) {
-                    Image("profile_placeholder")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 80, height: 80)
-                        .clipShape(Circle())
-                        .overlay(
-                            Circle().stroke(Color.gray.opacity(0.4), lineWidth: 1)
-                        )
-                        .shadow(radius: 2)
+                    if let avatarUrl = viewModel.profile?.avatarUrl,
+                       let url = URL(string: avatarUrl) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 80)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle().stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                                )
+                                .shadow(radius: 2)
+                        } placeholder: {
+                            ProgressView()
+                                .frame(width: 80, height: 80)
+                        }
                         .padding(.horizontal, 30)
+                    } else {
+                        Image("profile_placeholder")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 80, height: 80)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle().stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                            )
+                            .shadow(radius: 2)
+                            .padding(.horizontal, 30)
+                    }
                     
                     // Profile info (username, name, instrument, follower/following count)
                     VStack(alignment: .leading, spacing: 8) {
@@ -56,6 +75,14 @@ struct UserProfileView: View {
                             .font(.subheadline)
                         Text(viewModel.profile?.instrument ?? "")
                             .foregroundColor(.secondary)
+                        
+                        if let bio = viewModel.profile?.bio, !bio.isEmpty {
+                            Text(bio)
+                                .font(.callout)
+                                .foregroundColor(.primary)
+                                .padding(.top, 4)
+                                .lineLimit(3)
+                        }
                         
                         HStack(spacing: 16) {
                             VStack(alignment: .leading) {

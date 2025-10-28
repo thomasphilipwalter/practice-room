@@ -56,11 +56,25 @@ struct SearchView: View {
                     List(viewModel.searchResults) { profile in
                         NavigationLink(destination: UserProfileView(userId: profile.id)) {
                             HStack(spacing: 12) {
-                                Image("profile_placeholder")
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 50, height: 50)
-                                    .clipShape(Circle())
+                                if let avatarUrl = profile.avatarUrl,
+                                   let url = URL(string: avatarUrl) {
+                                    AsyncImage(url: url) { image in
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 50, height: 50)
+                                            .clipShape(Circle())
+                                    } placeholder: {
+                                        ProgressView()
+                                            .frame(width: 50, height: 50)
+                                    }
+                                } else {
+                                    Image("profile_placeholder")
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 50, height: 50)
+                                        .clipShape(Circle())
+                                }
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(profile.username ?? "Unknown")

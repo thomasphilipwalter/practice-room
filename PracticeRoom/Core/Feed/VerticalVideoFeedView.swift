@@ -9,6 +9,7 @@ import SwiftUI
 
 struct VerticalVideoFeedView: View {
     let videos: [Video]
+    let isSearchShowing: Bool
     @State private var currentIndex = 0
     
     var body: some View {
@@ -19,7 +20,8 @@ struct VerticalVideoFeedView: View {
                         ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
                             FeedVideoPlayerView(
                                 video: video,
-                                isCurrentVideo: index == currentIndex
+                                isCurrentVideo: index == currentIndex,
+                                isSearchShowing: isSearchShowing
                             )
                             .frame(
                                 width: geometry.size.width,

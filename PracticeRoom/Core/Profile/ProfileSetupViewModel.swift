@@ -17,6 +17,7 @@ struct ProfileSetupParams: Encodable {
     let fullName: String
     let instrument: String
     let avatarUrl: String?
+    let bio: String?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -24,6 +25,7 @@ struct ProfileSetupParams: Encodable {
         case fullName = "full_name"
         case instrument
         case avatarUrl = "avatar_url"
+        case bio
     }
 }
 
@@ -32,6 +34,7 @@ class ProfileSetupViewModel: ObservableObject {
     @Published var fullName = ""
     @Published var username = ""
     @Published var instrument = ""
+    @Published var bio = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -46,6 +49,21 @@ class ProfileSetupViewModel: ObservableObject {
         !fullName.trimmingCharacters(in: .whitespaces).isEmpty &&
         !username.trimmingCharacters(in: .whitespaces).isEmpty &&
         !instrument.isEmpty
+    }
+    
+    func checkUsernameAvailability() async -> Bool {
+        do {
+            let profiles: [Profile] = try await supabase
+                .from("profiles")
+                .select()
+                .eq("username", value: username)
+                .execute()
+                .value
+            
+            return profiles.isEmpty
+        } catch {
+            return false
+        }
     }
     
     // Handle photo selection
@@ -71,6 +89,14 @@ class ProfileSetupViewModel: ObservableObject {
         errorMessage = nil
         
         do {
+            // Check if username is available
+            let isAvailable = await checkUsernameAvailability()
+            if !isAvailable {
+                errorMessage = "Username '\(username)' is already taken. Please choose another."
+                isLoading = false
+                return
+            }
+            
             let currentUser = try await supabase.auth.session.user
             var avatarUrl: String? = nil
             
@@ -79,13 +105,17 @@ class ProfileSetupViewModel: ObservableObject {
                 avatarUrl = try await supabase.uploadAvatar(image: image, userId: currentUser.id)
             }
             
+            // handle bio
+            let bioValue = bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : bio
+            
             // Build profile data
             let params = ProfileSetupParams(
                 id: currentUser.id.uuidString,
                 username: username,
                 fullName: fullName,
                 instrument: instrument,
-                avatarUrl: avatarUrl
+                avatarUrl: avatarUrl,
+                bio: bioValue
             )
             
             try await supabase

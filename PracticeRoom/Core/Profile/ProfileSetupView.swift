@@ -125,6 +125,33 @@ struct ProfileSetupView: View {
                             .cornerRadius(10)
                         }
                     }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Bio (Optional)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        
+                        TextEditor(text: $viewModel.bio)
+                            .frame(height: 100)
+                            .padding(8)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color(.systemGray4), lineWidth: 0.5)
+                            )
+                        
+                        Text("\(viewModel.bio.count)/200 characters")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .onChange(of: viewModel.bio) { newValue in
+                        if newValue.count > 200 {
+                            viewModel.bio = String(newValue.prefix(200))
+                        }
+                    }
+                    
                 }
                 
                 // save profile

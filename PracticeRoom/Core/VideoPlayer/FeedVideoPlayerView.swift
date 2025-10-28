@@ -12,6 +12,7 @@ struct FeedVideoPlayerView: View {
     let video: Video
     @State private var player: AVPlayer?
     let isCurrentVideo: Bool
+    let isSearchShowing: Bool
     @SwiftUI.Environment(\.scenePhase) private var scenePhase  // Add this
     
     var body: some View {
@@ -59,23 +60,30 @@ struct FeedVideoPlayerView: View {
             }
         }
         .onChange(of: isCurrentVideo) { newValue in
-            if newValue {
+            if newValue && !isSearchShowing {
                 player?.play()
                 player?.seek(to: .zero)
             } else {
                 player?.pause()
             }
         }
+        .onChange(of: isSearchShowing) { newValue in
+            if newValue {
+                player?.pause()
+            } else if isCurrentVideo {
+                player?.play()
+            }
+        }
         .onChange(of: scenePhase) { newPhase in  // Pause when app goes to background or tab changes
             if newPhase != .active {
                 player?.pause()
-            } else if isCurrentVideo && newPhase == .active {
+            } else if isCurrentVideo && newPhase == .active && !isSearchShowing {
                 player?.play()
             }
         }
         .onAppear {
             setupPlayer()
-            if isCurrentVideo {
+            if isCurrentVideo && !isSearchShowing {
                 player?.play()
             }
         }

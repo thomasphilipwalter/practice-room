@@ -25,10 +25,13 @@ class SearchViewModel: ObservableObject {
         errorMessage = nil
         
         do {
+            let currentUser = try await supabase.auth.session.user
+            
             let results: [Profile] = try await supabase
                 .from("profiles")
                 .select()
                 .ilike("username", pattern: "%\(searchQuery)%")
+                .neq("id", value: currentUser.id)
                 .execute()
                 .value
             searchResults = results

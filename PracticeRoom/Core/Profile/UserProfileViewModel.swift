@@ -22,11 +22,28 @@ class UserProfileViewModel: ObservableObject {
     @Published var username = ""
     @Published var fullName = ""
     @Published var instrument = ""
+    @Published var bio = ""
     
     // Fields for photo handling
     @Published var selectedPhotoItem: PhotosPickerItem?
     @Published var selectedPhotoData: Data?
     @Published var selectedImage: UIImage?
+    
+    func checkUsernameAvailability(excluding currentUserId: UUID) async -> Bool {
+        do {
+            let profiles: [Profile] = try await supabase
+                .from("profiles")
+                .select()
+                .eq("username", value: username)
+                .neq("id", value: currentUserId)  // exclude current user
+                .execute()
+                .value
+            
+            return profiles.isEmpty
+        } catch {
+            return false
+        }
+    }
     
     func loadProfile(userId: UUID) async {
         isLoading = true
@@ -45,6 +62,7 @@ class UserProfileViewModel: ObservableObject {
             username = fetchedProfile.username ?? ""
             fullName = fetchedProfile.fullName ?? ""
             instrument = fetchedProfile.instrument ?? ""
+            bio = fetchedProfile.bio ?? ""
         } catch {
             errorMessage = "Failed to load profile: \(error.localizedDescription)"
         }
@@ -74,6 +92,14 @@ class UserProfileViewModel: ObservableObject {
         errorMessage = nil
         
         do {
+            // check if username is available (excluding current user)
+            let isAvailable = await checkUsernameAvailability(excluding: userId)
+            if !isAvailable {
+                errorMessage = "Username '\(username)' is already taken. Please choose another."
+                isLoading = false
+                return
+            }
+            
             var avatarUrl: String? = profile?.avatarUrl
             
             // Upload new avatar if selected
@@ -88,7 +114,8 @@ class UserProfileViewModel: ObservableObject {
                         username: username,
                         fullName: fullName,
                         instrument: instrument,
-                        avatarUrl: avatarUrl
+                        avatarUrl: avatarUrl,
+                        bio: bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : bio
                     )
                 )
                 .eq("id", value: userId)

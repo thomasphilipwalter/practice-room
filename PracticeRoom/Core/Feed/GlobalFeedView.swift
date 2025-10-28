@@ -38,7 +38,7 @@ struct GlobalFeedView: View {
                 }
                 .padding()
             } else {
-                VerticalVideoFeedView(videos: viewModel.videos)
+                VerticalVideoFeedView(videos: viewModel.videos, isSearchShowing: false)
             }
         }
         .task {
