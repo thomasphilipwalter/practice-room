@@ -4,15 +4,45 @@
 //
 //  Created by Thomas Walter on 10/23/25.
 //
+import Foundation
+import Supabase
+import Combine
 
-import SwiftUI
-
-struct SearchViewModel: View {
-    var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+@MainActor
+class SearchViewModel: ObservableObject {
+    @Published var searchQuery = ""
+    @Published var searchResults: [Profile] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    func searchUsers() async {
+        guard !searchQuery.isEmpty else {
+            searchResults = []
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let results: [Profile] = try await supabase
+                .from("profiles")
+                .select()
+                .ilike("username", pattern: "%\(searchQuery)%")
+                .execute()
+                .value
+            searchResults = results
+        } catch {
+            errorMessage = "Failed to search users: \(error.localizedDescription)"
+            searchResults = []
+        }
+        
+        isLoading = false
     }
-}
-
-#Preview {
-    SearchViewModel()
+    
+    func clearSearch() {
+        searchQuery = ""
+        searchResults = []
+        errorMessage = nil
+    }
 }

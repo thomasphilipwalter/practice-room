@@ -13,9 +13,7 @@ struct AuthView: View {
     var body: some View {
         ZStack {
             Color(.systemBackground).ignoresSafeArea()
-            
             VStack(spacing: 24) {
-                
                 // App Title
                 VStack(spacing: 8) {
                     Text("PracticeRoom")
@@ -39,7 +37,7 @@ struct AuthView: View {
                         .background(Color(.systemGray6))
                         .cornerRadius(10)
                     
-                    // email field required, valid email required
+                    // Validate Email
                     if !viewModel.email.isEmpty && !isValidEmail(viewModel.email) {
                         Text("Please enter a valid email address")
                             .font(.caption)
@@ -66,9 +64,10 @@ struct AuthView: View {
                 .background(isValidEmail(viewModel.email) && !viewModel.email.isEmpty ? Color.blue : Color.gray)
                 .foregroundColor(.white)
                 .cornerRadius(10)
-                .disabled(!isValidEmail(viewModel.email) || viewModel.email.isEmpty || viewModel.isLoading) // TODO: isLoading might be why bugging when you press button
+                .disabled(!isValidEmail(viewModel.email) || viewModel.email.isEmpty || viewModel.isLoading)
                 
-                // Success message
+                
+                // Success Message
                 if let successMessage = viewModel.successMessage {
                     HStack(spacing: 8) {
                         Image(systemName: "envelope.circle.fill")
@@ -80,10 +79,9 @@ struct AuthView: View {
                     .padding()
                     .background(Color.green.opacity(0.1))
                     .cornerRadius(10)
-                    
                 }
                 
-                // Error message
+                // Error Message
                 if let errorMessage = viewModel.errorMessage {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -96,17 +94,17 @@ struct AuthView: View {
                     .background(Color.red.opacity(0.1))
                     .cornerRadius(10)
                 }
-                
             }
         }
         .onOpenURL(perform: { url in
             Task {
-                await viewModel.handleMagicLinkCallback(url: url) // Perform sign in with magic link
+                await viewModel.handleMagicLinkCallback(url: url)   // Call when view opened from magic link
             }
         })
     }
     
-    // Validate email input
+    // function isValidEmail:
+    // - Checks if the email matches *@ format
     func isValidEmail(_ email: String) -> Bool {
         let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
         let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)

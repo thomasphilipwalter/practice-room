@@ -25,17 +25,22 @@ class VideoViewModel: ObservableObject {
     @Published var videoDescription = ""
     @Published var showUploadSheet = false
     
-    func loadVideos() async {
+    func loadVideos(userId: UUID? = nil) async {
         isLoading = true
         errorMessage = nil
         
         do {
             let currentUser = try await supabase.auth.session.user
             
+            let targetUserId = userId ?? currentUser.id
+            
+            // CONVERT TO LOWER CASE FOR THE QUERY
+            let userIdString = targetUserId.uuidString.lowercased()
+            
             let videos: [Video] = try await supabase
                 .from("videos")
                 .select()
-                .eq("user_id", value: currentUser.id)
+                .eq("user_id", value: userIdString)
                 .order("created_at", ascending: false)
                 .execute()
                 .value

@@ -4,12 +4,17 @@
 //
 //  Created by Thomas Walter on 10/15/25.
 //
+
 import Supabase
 import Foundation
 import Combine
 
+// NOTE: ViewModels should be performed on the main thread, pure UI Views need not
+// ObservableObject: A type of obj. with a publisher that emits before the object has changed
 @MainActor
 class AppViewModel: ObservableObject {
+    // Initial state loading. @Published is a property wrapper that notifies SwiftUI on any change
+    // NOTE: .loading = shorthand for AppState.loading
     @Published var appState: AppState = .loading
     
     enum AppState {
@@ -23,8 +28,9 @@ class AppViewModel: ObservableObject {
         Task {
             await refreshProfile()
             
+            // Listen forever for auth changes
             Task {
-                for await state in supabase.auth.authStateChanges {
+                for await state in supabase.auth.authStateChanges { // NOTE: 'for await' used to iterate over an asynchronous stream
                     if [.initialSession, .signedIn, .signedOut].contains(state.event) {
                         await updateAppState(session: state.session)
                     }
@@ -33,31 +39,13 @@ class AppViewModel: ObservableObject {
         }
     }
     
-//    private func setupAuthListener() async {
-//        await refreshProfile()
-//        
-//        // Listen to changes in authentication state
-//        // Types
-//        //      - INITIAL_SESSION
-//        //      - SIGNED_IN
-//        //      - SIGNED_OUT
-//        //      - TOKEN_REFRESHED
-//        //      - USER_UPDATED
-//        //      - PASSWORD_RECOVERY
-//        for await state in supabase.auth.authStateChanges {
-//            if [.initialSession, .signedIn, .signedOut].contains(state.event) {
-//                await updateAppState(session: state.session)
-//            }
-//        }
-//    }
-    
-    // Function updateAppState:
-    //      - Take a state.session (nil if signed out) and decide which AppState to present
+    // Function: updateAppState(session: Session?)
+    // - Take supabase session as input
+    // - Set app state appropiately
     func updateAppState(session: Session?) async {
         
-        // guard: only assign if not nil
+        // CASE 1: unauthenticated —> if session is nil
         guard let session = session else {
-            // if nil, signed out —> set unauthenticated
             appState = .unauthenticated
             return
         }
@@ -72,11 +60,12 @@ class AppViewModel: ObservableObject {
                 .execute()
                 .value
             
-            // if name, instrument, username empty, needs profile setup
+            // CASE 2: authenticated and profile complete —> if fullName, instrument, username setup
             if let fullName = profile.fullName, !fullName.isEmpty,
                let instrument = profile.instrument, !instrument.isEmpty,
                let username = profile.username, !username.isEmpty {
                 appState = .authenticated
+            // CASE 3: needsProfileSetup –> if one of fullName, instrument, username not filled out
             } else {
                 appState = .needsProfileSetup
             }
@@ -85,12 +74,15 @@ class AppViewModel: ObservableObject {
         }
     }
     
+    // Function: refreshProfile()
+    // - Checks supabase session
+    // - Calls updateAppState to update state
     func refreshProfile() async {
         do {
             let session = try await supabase.auth.session
             await updateAppState(session: session)
         } catch {
-            // Handle error in session update
+            // TODO: Handle error appropriately
         }
     }
 }

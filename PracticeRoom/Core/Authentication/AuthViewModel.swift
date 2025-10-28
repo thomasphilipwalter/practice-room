@@ -18,8 +18,7 @@ class AuthViewModel: ObservableObject {
     @Published var email = ""
     
     
-    // Function signInWithMagicLink
-    //      - call supabase function to send magic link to email
+    // SEND Magic Link
     func signInWithMagicLink(email: String) async {
         isLoading = true
         errorMessage = nil
@@ -37,8 +36,7 @@ class AuthViewModel: ObservableObject {
     }
     
     
-    // Function handleMagicLinkCallback
-    //      - Log in from magic link callback
+    // HANDLE Magic Link
     func handleMagicLinkCallback(url: URL) async {
         do {
             try await supabase.auth.session(from: url)
@@ -50,8 +48,7 @@ class AuthViewModel: ObservableObject {
 
     }
     
-    // Function signOut()
-    //      - sign out using supabase function
+    // SIGN Out
     func signOut() async {
         do {
             try await supabase.auth.signOut()
@@ -63,8 +60,7 @@ class AuthViewModel: ObservableObject {
     }
     
     
-    // Function checkAuthState()
-    //      - check the auth state
+    // CHECK Auth State
     func checkAuthState() async {
         do {
             let _ = try await supabase.auth.session

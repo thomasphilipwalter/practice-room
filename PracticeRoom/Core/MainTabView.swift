@@ -7,6 +7,9 @@
 
 import SwiftUI
 
+// —————— MAIN TAB ———————
+// Implements main tab at the bottom of the application
+
 struct MainTabView: View {
     @State private var selectedTab = 0
     

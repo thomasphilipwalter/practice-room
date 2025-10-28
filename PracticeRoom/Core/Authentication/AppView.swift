@@ -7,10 +7,15 @@
 
 import SwiftUI
 
-// View: defines a visual element of screen. Can be made up of
 struct AppView: View {
+    // Import the view model
     @StateObject private var viewModel = AppViewModel()
     
+    // Switch between four possible views:
+    //  1. Loading
+    //  2. Not authenticated
+    //  3. Authenticated but needs profile setup
+    //  4. Authenticated
     var body: some View {
         Group {
             switch viewModel.appState {

@@ -15,63 +15,19 @@ class ProfileViewModel: ObservableObject {
     @Published var instrument = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var currentUserId: UUID?
     
-    func loadProfile() async {
+    // Function to set currentUserId
+    func setCurrentUserId() async {
+        guard currentUserId == nil else { return } // don't reload if already loaded
         isLoading = true
         errorMessage = nil
-        
         do {
-            let currentUser = try await supabase.auth.session.user
-            
-            let profile: Profile = try await supabase
-                .from("profiles")
-                .select()
-                .eq("id", value: currentUser.id)
-                .single()
-                .execute()
-                .value
-            
-            self.username = profile.username ?? ""
-            self.fullName = profile.fullName ?? ""
-            self.instrument = profile.instrument ?? ""
+            let user = try await supabase.auth.session.user
+            currentUserId = user.id
         } catch {
-            errorMessage = "Failed to load profile: \(error.localizedDescription)"
+            errorMessage = "Failed to get current user id: \(error.localizedDescription)"
         }
-        
         isLoading = false
     }
-    
-    func updateProfile() async {
-        isLoading = true
-        errorMessage = nil
-        
-        do {
-            let currentUser = try await supabase.auth.session.user
-            
-            try await supabase
-                .from("profiles")
-                .update(
-                    UpdateProfileParams(
-                        username: username,
-                        fullName: fullName,
-                        instrument: instrument
-                    )
-                )
-                .eq("id", value: currentUser.id)
-                .execute()
-        } catch {
-            errorMessage = "Failed to update profile: \(error.localizedDescription)"
-        }
-        
-        isLoading = false
-    }
-    
-    func signOut() async {
-        do {
-            try await supabase.auth.signOut()
-        } catch {
-            errorMessage = "Sign out failed: \(error.localizedDescription)"
-        }
-    }
-    
 }
