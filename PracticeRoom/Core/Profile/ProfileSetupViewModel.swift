@@ -11,24 +11,6 @@ import UIKit
 import PhotosUI
 import _PhotosUI_SwiftUI
 
-struct ProfileSetupParams: Encodable {
-    let id: String
-    let username: String
-    let fullName: String
-    let instrument: String
-    let avatarUrl: String?
-    let bio: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case username
-        case fullName = "full_name"
-        case instrument
-        case avatarUrl = "avatar_url"
-        case bio
-    }
-}
-
 @MainActor
 class ProfileSetupViewModel: ObservableObject {
     @Published var fullName = ""
@@ -53,14 +35,7 @@ class ProfileSetupViewModel: ObservableObject {
     
     func checkUsernameAvailability() async -> Bool {
         do {
-            let profiles: [Profile] = try await supabase
-                .from("profiles")
-                .select()
-                .eq("username", value: username)
-                .execute()
-                .value
-            
-            return profiles.isEmpty
+            return try await supabase.checkUsernameAvailability(username: username)
         } catch {
             return false
         }
@@ -69,7 +44,6 @@ class ProfileSetupViewModel: ObservableObject {
     // Handle photo selection
     func handlePhotoSelection() async {
         guard let selectedPhotoItem else { return }
-        
         do {
             if let data = try await selectedPhotoItem.loadTransferable(type: Data.self) {
                 selectedPhotoData = data
@@ -82,32 +56,25 @@ class ProfileSetupViewModel: ObservableObject {
         }
     }
     
-    // Function saveProfile
-    //      - save profile on setup
+    // Save Profile on setup
     func saveProfile() async {
         isLoading = true
         errorMessage = nil
-        
         do {
-            // Check if username is available
             let isAvailable = await checkUsernameAvailability()
             if !isAvailable {
                 errorMessage = "Username '\(username)' is already taken. Please choose another."
                 isLoading = false
                 return
             }
-            
-            let currentUser = try await supabase.auth.session.user
+            let currentUser = try await supabase.getCurrentUser()
             var avatarUrl: String? = nil
-            
             // upload avatar if selected
             if let image = selectedImage {
                 avatarUrl = try await supabase.uploadAvatar(image: image, userId: currentUser.id)
             }
-            
             // handle bio
             let bioValue = bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : bio
-            
             // Build profile data
             let params = ProfileSetupParams(
                 id: currentUser.id.uuidString,
@@ -117,16 +84,10 @@ class ProfileSetupViewModel: ObservableObject {
                 avatarUrl: avatarUrl,
                 bio: bioValue
             )
-            
-            try await supabase
-                .from("profiles")
-                .upsert(params)
-                .execute()
-                
+            try await supabase.upsertProfile(params: params)
         } catch {
             errorMessage = "Failed to save profile. Please try again."
         }
-        
         isLoading = false
     }
 }

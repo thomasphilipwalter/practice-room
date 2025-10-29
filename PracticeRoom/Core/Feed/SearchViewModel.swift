@@ -20,26 +20,18 @@ class SearchViewModel: ObservableObject {
             searchResults = []
             return
         }
-        
         isLoading = true
         errorMessage = nil
-        
         do {
-            let currentUser = try await supabase.auth.session.user
-            
-            let results: [Profile] = try await supabase
-                .from("profiles")
-                .select()
-                .ilike("username", pattern: "%\(searchQuery)%")
-                .neq("id", value: currentUser.id)
-                .execute()
-                .value
-            searchResults = results
+            let currentUser = try await supabase.getCurrentUser()
+            searchResults = try await supabase.searchUsers(
+                query: searchQuery,
+                excludingUserId: currentUser.id
+            )
         } catch {
             errorMessage = "Failed to search users: \(error.localizedDescription)"
             searchResults = []
         }
-        
         isLoading = false
     }
     

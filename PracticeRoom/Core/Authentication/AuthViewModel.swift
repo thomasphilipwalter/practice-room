@@ -25,7 +25,7 @@ class AuthViewModel: ObservableObject {
         successMessage = nil
         
         do {
-            try await supabase.auth.signInWithOTP(email: email)
+            try await supabase.signInWithMagicLink(email: email)
             self.email = email
             successMessage = "Check your email for the magic link!"
         } catch {
@@ -39,7 +39,7 @@ class AuthViewModel: ObservableObject {
     // HANDLE Magic Link
     func handleMagicLinkCallback(url: URL) async {
         do {
-            try await supabase.auth.session(from: url)
+            try await supabase.handleMagicLinkCallback(url: url)
             successMessage = "Successfully signed in!"
             isAuthenticated = true
         } catch {
@@ -51,7 +51,7 @@ class AuthViewModel: ObservableObject {
     // SIGN Out
     func signOut() async {
         do {
-            try await supabase.auth.signOut()
+            try await supabase.signOut()
             isAuthenticated = false
             email = ""
         } catch {
@@ -63,7 +63,7 @@ class AuthViewModel: ObservableObject {
     // CHECK Auth State
     func checkAuthState() async {
         do {
-            let _ = try await supabase.auth.session
+            let _ = try await supabase.getCurrentSession()
             isAuthenticated = true
         } catch {
             isAuthenticated = false

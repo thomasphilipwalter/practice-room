@@ -1,10 +1,3 @@
-//
-//  UserProfileViewModel.swift
-//  PracticeRoom
-//
-//  Created by Thomas Walter on 10/23/25.
-//
-
 import Foundation
 import Supabase
 import Combine
@@ -31,15 +24,10 @@ class UserProfileViewModel: ObservableObject {
     
     func checkUsernameAvailability(excluding currentUserId: UUID) async -> Bool {
         do {
-            let profiles: [Profile] = try await supabase
-                .from("profiles")
-                .select()
-                .eq("username", value: username)
-                .neq("id", value: currentUserId)  // exclude current user
-                .execute()
-                .value
-            
-            return profiles.isEmpty
+            return try await supabase.checkUsernameAvailability(
+                username: username,
+                excluding: currentUserId
+            )
         } catch {
             return false
         }
@@ -48,16 +36,10 @@ class UserProfileViewModel: ObservableObject {
     func loadProfile(userId: UUID) async {
         isLoading = true
         errorMessage = nil
-        
         do {
-            let fetchedProfile: Profile = try await supabase
-                .from("profiles")
-                .select()
-                .eq("id", value: userId)
-                .single()
-                .execute()
-                .value
+            let fetchedProfile = try await supabase.loadProfile(userId: userId)
             profile = fetchedProfile
+            
             // Sync to editable fields
             username = fetchedProfile.username ?? ""
             fullName = fetchedProfile.fullName ?? ""
@@ -69,12 +51,10 @@ class UserProfileViewModel: ObservableObject {
         isLoading = false
     }
     
-    // handle photo selection
     func handlePhotoSelection() async {
         guard let selectedPhotoItem else {
             return
         }
-        
         do {
             if let data = try await selectedPhotoItem.loadTransferable(type: Data.self) {
                 selectedPhotoData = data
@@ -90,7 +70,6 @@ class UserProfileViewModel: ObservableObject {
     func updateProfile(userId: UUID) async {
         isLoading = true
         errorMessage = nil
-        
         do {
             // check if username is available (excluding current user)
             let isAvailable = await checkUsernameAvailability(excluding: userId)
@@ -99,31 +78,23 @@ class UserProfileViewModel: ObservableObject {
                 isLoading = false
                 return
             }
-            
             var avatarUrl: String? = profile?.avatarUrl
-            
             // Upload new avatar if selected
             if let image = selectedImage {
                 avatarUrl = try await supabase.uploadAvatar(image: image, userId: userId)
             }
-            
-            try await supabase
-                .from("profiles")
-                .update(
-                    UpdateProfileParams(
-                        username: username,
-                        fullName: fullName,
-                        instrument: instrument,
-                        avatarUrl: avatarUrl,
-                        bio: bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : bio
-                    )
+            try await supabase.updateProfile(
+                userId: userId,
+                params: UpdateProfileParams(
+                    username: username,
+                    fullName: fullName,
+                    instrument: instrument,
+                    avatarUrl: avatarUrl,
+                    bio: bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : bio
                 )
-                .eq("id", value: userId)
-                .execute()
-            
+            )
             // Reload profile after successful update
             await loadProfile(userId: userId)
-            
             // clear selection after successful upload
             selectedPhotoItem = nil
             selectedImage = nil
@@ -131,7 +102,6 @@ class UserProfileViewModel: ObservableObject {
         } catch {
             errorMessage = "Failed to update profile: \(error.localizedDescription)"
         }
-        
         isLoading = false
     }
 }

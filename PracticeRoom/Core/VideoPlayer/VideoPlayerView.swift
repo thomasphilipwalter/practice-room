@@ -57,7 +57,6 @@ struct VideoPlayerView: View {
     
     private func setupPlayer() {
         guard let url = URL(string: video.videoUrl) else {
-            print("❌ Invalid video URL: \(video.videoUrl)")
             return
         }
         

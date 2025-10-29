@@ -9,12 +9,8 @@ import Supabase
 import Foundation
 import Combine
 
-// NOTE: ViewModels should be performed on the main thread, pure UI Views need not
-// ObservableObject: A type of obj. with a publisher that emits before the object has changed
 @MainActor
 class AppViewModel: ObservableObject {
-    // Initial state loading. @Published is a property wrapper that notifies SwiftUI on any change
-    // NOTE: .loading = shorthand for AppState.loading
     @Published var appState: AppState = .loading
     
     enum AppState {
@@ -28,7 +24,6 @@ class AppViewModel: ObservableObject {
         Task {
             await refreshProfile()
             
-            // Listen forever for auth changes
             Task {
                 for await state in supabase.auth.authStateChanges { // NOTE: 'for await' used to iterate over an asynchronous stream
                     if [.initialSession, .signedIn, .signedOut].contains(state.event) {
@@ -38,28 +33,18 @@ class AppViewModel: ObservableObject {
             }
         }
     }
-    
-    // Function: updateAppState(session: Session?)
-    // - Take supabase session as input
-    // - Set app state appropiately
+
     func updateAppState(session: Session?) async {
-        
         // CASE 1: unauthenticated —> if session is nil
         guard let session = session else {
             appState = .unauthenticated
             return
         }
-        
+    
         do {
             // query profile data model on session's user id
-            let profile: Profile = try await supabase
-                .from("profiles")
-                .select()
-                .eq("id", value: session.user.id)
-                .single()
-                .execute()
-                .value
-            
+            let profile = try await supabase.loadProfile(userId: session.user.id)
+
             // CASE 2: authenticated and profile complete —> if fullName, instrument, username setup
             if let fullName = profile.fullName, !fullName.isEmpty,
                let instrument = profile.instrument, !instrument.isEmpty,
@@ -74,15 +59,12 @@ class AppViewModel: ObservableObject {
         }
     }
     
-    // Function: refreshProfile()
-    // - Checks supabase session
-    // - Calls updateAppState to update state
     func refreshProfile() async {
         do {
-            let session = try await supabase.auth.session
+            let session = try await supabase.getCurrentSession()
             await updateAppState(session: session)
         } catch {
-            // TODO: Handle error appropriately
+            await updateAppState(session: nil)
         }
     }
 }

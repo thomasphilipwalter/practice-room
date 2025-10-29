@@ -7,6 +7,23 @@
 
 import Foundation
 
+struct ProfileSetupParams: Encodable {
+    let id: String
+    let username: String
+    let fullName: String
+    let instrument: String
+    let avatarUrl: String?
+    let bio: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case username
+        case fullName = "full_name"
+        case instrument
+        case avatarUrl = "avatar_url"
+        case bio
+    }
+}
 
 struct Profile: Decodable, Identifiable {
     let id: UUID

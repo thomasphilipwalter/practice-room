@@ -10,9 +10,6 @@ import Combine
 
 @MainActor
 class ProfileViewModel: ObservableObject {
-    @Published var username = ""
-    @Published var fullName = ""
-    @Published var instrument = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var currentUserId: UUID?
@@ -23,7 +20,7 @@ class ProfileViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         do {
-            let user = try await supabase.auth.session.user
+            let user = try await supabase.getCurrentUser()
             currentUserId = user.id
         } catch {
             errorMessage = "Failed to get current user id: \(error.localizedDescription)"
