@@ -11,16 +11,25 @@ import Combine
 
 @MainActor
 class FollowViewModel: ObservableObject {
-    @Published var isFollowing = false
+    @Published var followStatus: FollowStatus?
     @Published var followerCount = 0
     @Published var followingCount = 0
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    func checkIfFollowing(userId: UUID) async {
+    var isFollowing: Bool {
+        followStatus == .accepted
+    }
+    
+    var isPending: Bool {
+        followStatus == .pending
+    }
+    
+    // check follow stat with target user
+    func checkFollowStatus(userId: UUID) async {
         do {
             let currentUser = try await supabase.getCurrentUser()
-            isFollowing = try await supabase.checkIfFollowing(
+            followStatus = try await supabase.getFollowStatus(
                 followerId: currentUser.id,
                 followingId: userId
             )
@@ -40,20 +49,20 @@ class FollowViewModel: ObservableObject {
         }
     }
     
-    func followUser(userId: UUID) async {
+    // Send follow request
+    func sendFollowRequest(userId: UUID) async {
         isLoading = true
         errorMessage = nil
         do {
             let currentUser = try await supabase.getCurrentUser()
-            try await supabase.followUser(
+            try await supabase.sendFollowRequest(
                 followerId: currentUser.id,
                 followingId: userId
             )
-            isFollowing = true
-            followerCount += 1
+            followStatus = .pending
         } catch {
-            print("Error following user: \(error)")
-            errorMessage = "Failed to follow user"
+            print("Error sending follow request: \(error)")
+            errorMessage = "Failed to send follow request"
         }
         isLoading = false
     }
@@ -63,16 +72,55 @@ class FollowViewModel: ObservableObject {
         errorMessage = nil
         do {
             let currentUser = try await supabase.getCurrentUser()
-            try await supabase.unfollowUser(
-                followerId: currentUser.id,
-                followingId: userId
-            )
-            isFollowing = false
-            followerCount -= 1
+            if followStatus == .pending {
+                try await supabase.cancelFollowRequest(
+                    followerId: currentUser.id,
+                    followingId: userId
+                )
+            } else {
+                try await supabase.unfollowUser(
+                    followerId: currentUser.id,
+                    followingId: userId
+                )
+                followerCount = max(0, followerCount - 1)
+            }
+            followStatus = nil
         } catch {
             print("Error unfollowing user: \(error)")
             errorMessage = "Failed to unfollow user"
         }
         isLoading = false
     }
+    
+//    
+//    func checkIfFollowing(userId: UUID) async {
+//        do {
+//            let currentUser = try await supabase.getCurrentUser()
+//            isFollowing = try await supabase.checkIfFollowing(
+//                followerId: currentUser.id,
+//                followingId: userId
+//            )
+//        } catch {
+//            print("Error checking follow status: \(error)")
+//            errorMessage = "Failed to check follow status"
+//        }
+//    }
+//    
+//    func followUser(userId: UUID) async {
+//        isLoading = true
+//        errorMessage = nil
+//        do {
+//            let currentUser = try await supabase.getCurrentUser()
+//            try await supabase.followUser(
+//                followerId: currentUser.id,
+//                followingId: userId
+//            )
+//            isFollowing = true
+//            followerCount += 1
+//        } catch {
+//            print("Error following user: \(error)")
+//            errorMessage = "Failed to follow user"
+//        }
+//        isLoading = false
+//    }
 }

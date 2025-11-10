@@ -103,7 +103,7 @@ extension SupabaseClient {
         let fileExtension = "jpg"
         let fileName = "\(userId.uuidString).\(fileExtension)"
         let filePath = "\(userId.uuidString)/\(fileName)"
-
+        
         try await self.storage
             .from("avatars")
             .upload(
@@ -244,9 +244,10 @@ extension SupabaseClient {
     
     // ------- FOLOW OPERATIONS -------
     
-    // Check if current user is following a specific user
-    func checkIfFollowing(followerId: UUID, followingId: UUID) async throws -> Bool {
-        let follows: [Follow] = try await self
+    // Send a follow request (creates pending row)
+    func sendFollowRequest(followerId: UUID, followingId: UUID) async throws {
+        // Prevent duplicates
+        let existing: [Follow] = try await self
             .from("follows")
             .select()
             .eq("follower_id", value: followerId.uuidString.lowercased())
@@ -254,42 +255,19 @@ extension SupabaseClient {
             .execute()
             .value
         
-        return !follows.isEmpty
-    }
-    
-    // Get follower count for a user
-    func getFollowerCount(userId: UUID) async throws -> Int {
-        let userIdString = userId.uuidString.lowercased()
+        if !existing.isEmpty {
+            // If it already exists, do nothing or throw depending on your preference
+            throw NSError(
+                domain: "FollowError",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Follow request already exists"]
+            )
+        }
         
-        let followers: [Follow] = try await self
-            .from("follows")
-            .select()
-            .eq("following_id", value: userIdString)
-            .execute()
-            .value
-        
-        return followers.count
-    }
-    
-    // Get following count for a user
-    func getFollowingCount(userId: UUID) async throws -> Int {
-        let userIdString = userId.uuidString.lowercased()
-        
-        let following: [Follow] = try await self
-            .from("follows")
-            .select()
-            .eq("follower_id", value: userIdString)
-            .execute()
-            .value
-        
-        return following.count
-    }
-    
-    // Follow a user
-    func followUser(followerId: UUID, followingId: UUID) async throws {
         let followInsert = FollowInsert(
             followerId: followerId,
-            followingId: followingId
+            followingId: followingId,
+            status: FollowStatus.pending.rawValue
         )
         
         try await self
@@ -298,7 +276,36 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Unfollow a user
+    // Accept a follow request (set status = accepted)
+    func acceptFollowRequest(followId: UUID) async throws {
+        try await self
+            .from("follows")
+            .update(FollowUpdate(status: FollowStatus.accepted.rawValue))
+            .eq("id", value: followId.uuidString.lowercased())
+            .execute()
+    }
+    
+    // Reject a follow request (set status = rejected)
+    func rejectFollowRequest(followId: UUID) async throws {
+        try await self
+            .from("follows")
+            .delete()
+            .eq("id", value: followId.uuidString.lowercased())
+            .execute()
+    }
+    
+    // Cancel a pending follow request you sent
+    func cancelFollowRequest(followerId: UUID, followingId: UUID) async throws {
+        try await self
+            .from("follows")
+            .delete()
+            .eq("follower_id", value: followerId.uuidString.lowercased())
+            .eq("following_id", value: followingId.uuidString.lowercased())
+            .eq("status", value: FollowStatus.pending.rawValue)
+            .execute()
+    }
+    
+    // Unfollow (remove accepted follow)
     func unfollowUser(followerId: UUID, followingId: UUID) async throws {
         try await self
             .from("follows")
@@ -306,5 +313,57 @@ extension SupabaseClient {
             .eq("follower_id", value: followerId.uuidString.lowercased())
             .eq("following_id", value: followingId.uuidString.lowercased())
             .execute()
+    }
+    
+    // Get follow status between two users (nil if no row)
+    func getFollowStatus(followerId: UUID, followingId: UUID) async throws -> FollowStatus? {
+        let follows: [Follow] = try await self
+            .from("follows")
+            .select()
+            .eq("follower_id", value: followerId.uuidString.lowercased())
+            .eq("following_id", value: followingId.uuidString.lowercased())
+            .execute()
+            .value
+        return follows.first?.status
+    }
+    
+    // Get pending follow requests for a user (they are the target/following)
+    func getPendingFollowRequests(userId: UUID) async throws -> [Follow] {
+        let userIdString = userId.uuidString.lowercased()
+        let pending: [Follow] = try await self
+            .from("follows")
+            .select()
+            .eq("following_id", value: userIdString)
+            .eq("status", value: FollowStatus.pending.rawValue)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+        return pending
+    }
+    
+    // Get follower count for a user (accepted only)
+    func getFollowerCount(userId: UUID) async throws -> Int {
+        let userIdString = userId.uuidString.lowercased()
+        let followers: [Follow] = try await self
+            .from("follows")
+            .select()
+            .eq("following_id", value: userIdString)
+            .eq("status", value: FollowStatus.accepted.rawValue)
+            .execute()
+            .value
+        return followers.count
+    }
+    
+    // Get following count for a user (accepted only)
+    func getFollowingCount(userId: UUID) async throws -> Int {
+        let userIdString = userId.uuidString.lowercased()
+        let following: [Follow] = try await self
+            .from("follows")
+            .select()
+            .eq("follower_id", value: userIdString)
+            .eq("status", value: FollowStatus.accepted.rawValue)
+            .execute()
+            .value
+        return following.count
     }
 }

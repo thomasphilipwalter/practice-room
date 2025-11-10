@@ -97,22 +97,42 @@ struct Follow: Identifiable, Codable {
     let id: UUID
     let followerId: UUID
     let followingId: UUID
+    let status: FollowStatus
     let createdAt: Date
     
     enum CodingKeys: String, CodingKey {
         case id
         case followerId = "follower_id"
         case followingId = "following_id"
+        case status
         case createdAt = "created_at"
     }
+}
+
+enum FollowStatus: String, Codable {
+    case pending
+    case accepted
+    case rejected
 }
 
 struct FollowInsert: Encodable {
     let followerId: UUID
     let followingId: UUID
+    let status: String
     
     enum CodingKeys: String, CodingKey {
         case followerId = "follower_id"
         case followingId = "following_id"
+        case status
     }
+}
+
+struct FollowUpdate: Encodable {
+    let status: String
+}
+
+struct PendingFollowRequest: Identifiable {
+    let id: UUID
+    let followRequest: Follow
+    let fromUserProfile: Profile
 }

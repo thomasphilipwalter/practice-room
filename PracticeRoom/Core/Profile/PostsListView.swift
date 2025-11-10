@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhotosUI
+import AVFoundation
 
 struct PostsListView: View {
     @StateObject private var videoViewModel = VideoViewModel()
@@ -19,9 +20,9 @@ struct PostsListView: View {
     
     // grid layout - 3 columns
     let columns = [
-        GridItem(.flexible(), spacing: 2),
-        GridItem(.flexible(), spacing: 2),
-        GridItem(.flexible(), spacing: 2)
+        GridItem(.flexible(), spacing: 0),
+        GridItem(.flexible(), spacing: 0),
+        GridItem(.flexible(), spacing: 0)
     ]
     
     var body: some View {
@@ -32,19 +33,23 @@ struct PostsListView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "video.slash")
                         .font(.system(size: 60))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.black)
                     Text("No videos uploaded yet")
                         .font(.title3)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.black)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
             } else {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 2) {
+                    LazyVGrid(columns: columns, spacing: 0) {
                         ForEach(videoViewModel.videos) { video in
                             VideoThumbnailView(video: video)
-                                .aspectRatio(1, contentMode: .fill)
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay(
+                                    Rectangle()
+                                        .stroke(Color.white, lineWidth: 1)
+                                )
                                 .onTapGesture {
                                     selectedVideo = video
                                 }
@@ -67,18 +72,20 @@ struct PostsListView: View {
 // thumbnail view for grid
 struct VideoThumbnailView: View {
     let video: Video
+    @State private var thumbnailImage: UIImage?
+    @State private var isLoading = true
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // thumbnail placeholder
-            Rectangle()
-                .fill(Color.gray.opacity(0.3))
-            
-            // video play icon
-            Image(systemName: "play.circle.fill")
-                .font(.system(size: 30))
-                .foregroundColor(.white)
-                .shadow(radius: 2)
+            // thumbnail image or placeholder
+            if let thumbnailImage = thumbnailImage {
+                Image(uiImage: thumbnailImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+            }
             
             // video title overlay
             VStack(alignment: .leading, spacing: 2) {
@@ -91,7 +98,36 @@ struct VideoThumbnailView: View {
             }
             .padding(8)
         }
+        .aspectRatio(1, contentMode: .fit)
         .clipped()
+        .onAppear {
+            generateThumbnail()
+        }
+    }
+    
+    private func generateThumbnail() {
+        guard let url = URL(string: video.videoUrl) else {
+            isLoading = false
+            return
+        }
+        
+        Task {
+            let asset = AVAsset(url: url)
+            let imageGenerator = AVAssetImageGenerator(asset: asset)
+            imageGenerator.appliesPreferredTrackTransform = true
+            
+            do {
+                let cgImage = try await imageGenerator.image(at: CMTime.zero).image
+                await MainActor.run {
+                    self.thumbnailImage = UIImage(cgImage: cgImage)
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.isLoading = false
+                }
+            }
+        }
     }
 }
 

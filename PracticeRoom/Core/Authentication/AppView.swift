@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct AppView: View {
     // Import the view model

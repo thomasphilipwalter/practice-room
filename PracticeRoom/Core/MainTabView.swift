@@ -7,23 +7,21 @@
 
 import SwiftUI
 
-// —————— MAIN TAB ———————
-// Implements main tab at the bottom of the application
-
 struct MainTabView: View {
     @State private var selectedTab = 0
+    @StateObject private var notificationsViewModel = NotificationsViewModel()
     
     var body: some View {
         TabView(selection: $selectedTab) {
             
             GlobalFeedView()
-                .tabItem() {
+                .tabItem {
                     Label("Feed", systemImage: "house.fill")
                 }
                 .tag(0)
             
             FriendsFeedView()
-                .tabItem() {
+                .tabItem {
                     Label("Friends", systemImage: "heart.fill")
                 }
                 .tag(1)
@@ -34,11 +32,36 @@ struct MainTabView: View {
                 }
                 .tag(2)
             
+            // Pass the same viewModel so the badge and the list stay in sync
+            NotificationsView(viewModel: notificationsViewModel)
+                .tabItem {
+                    Label("Requests", systemImage: "bell.fill")
+                }
+                .badge(notificationsViewModel.unreadCount)
+                .tag(3)
+            
             ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }
-                .tag(3)
+                .tag(4)
+        }
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarBackground(Color(red: 122/255, green: 54/255, blue: 17/255), for: .tabBar)
+        // Initial fetch for the badge
+        .task {
+            await notificationsViewModel.loadPendingFollowRequests()
+        }
+        // Refresh when user switches to the notifications tab
+        .onChange(of: selectedTab) { newValue in
+            if newValue == 3 {
+                Task { await notificationsViewModel.loadPendingFollowRequests() }
+            }
         }
     }
+}
+
+
+#Preview {
+    MainTabView()
 }

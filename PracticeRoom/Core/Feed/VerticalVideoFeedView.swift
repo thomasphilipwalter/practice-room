@@ -52,6 +52,6 @@ struct VerticalVideoFeedView: View {
                 .scrollDisabled(true) // Disable default scrolling
             }
         }
-        .ignoresSafeArea()
+        .ignoresSafeArea(edges: .top)
     }
 }

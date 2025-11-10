@@ -68,7 +68,7 @@ struct FriendsFeedView: View {
             }
             .allowsHitTesting(true)  // Allow touches on overlay
         }
-        .ignoresSafeArea()
+        .ignoresSafeArea(edges: .top)
         .sheet(isPresented: $showSearchView) {
             SearchView()
         }
