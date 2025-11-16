@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct VerticalVideoFeedView: View {
-    let videos: [Video]
+    @ObservedObject var viewModel: FeedViewModel
     let isSearchShowing: Bool
     @State private var currentIndex = 0
     
@@ -17,7 +17,7 @@ struct VerticalVideoFeedView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(videos.enumerated()), id: \.element.id) { index, video in
+                        ForEach(Array(viewModel.videos.enumerated()), id: \.element.id) { index, video in
                             FeedVideoPlayerView(
                                 video: video,
                                 isCurrentVideo: index == currentIndex,
@@ -28,17 +28,23 @@ struct VerticalVideoFeedView: View {
                                 height: geometry.size.height
                             )
                             .id(index)
+                            .onAppear {
+                                // Load more when approaching end (3 videos before end)
+                                if index >= viewModel.videos.count - 3 {
+                                    Task {
+                                        await viewModel.loadMoreVideos()
+                                    }
+                                }
+                            }
                             .gesture(
                                 DragGesture(minimumDistance: 50)
                                     .onEnded { value in
-                                        if value.translation.height < 0 && currentIndex < videos.count - 1 {
-                                            // Swipe up - next video
+                                        if value.translation.height < 0 && currentIndex < viewModel.videos.count - 1 {
                                             currentIndex += 1
                                             withAnimation {
                                                 proxy.scrollTo(currentIndex, anchor: .top)
                                             }
                                         } else if value.translation.height > 0 && currentIndex > 0 {
-                                            // Swipe down - previous video
                                             currentIndex -= 1
                                             withAnimation {
                                                 proxy.scrollTo(currentIndex, anchor: .top)
@@ -47,9 +53,15 @@ struct VerticalVideoFeedView: View {
                                     }
                             )
                         }
+                        
+                        // Loading indicator at bottom
+                        if viewModel.isLoadingMore {
+                            ProgressView()
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                        }
                     }
                 }
-                .scrollDisabled(true) // Disable default scrolling
+                .scrollDisabled(true)
             }
         }
         .ignoresSafeArea(edges: .top)

@@ -159,11 +159,12 @@ extension SupabaseClient {
     }
     
     // Load all videos (for global feed)
-    func loadAllVideos() async throws -> [Video] {
+    func loadAllVideos(limit: Int = 10, offset: Int = 0) async throws -> [Video] {
         let videos: [Video] = try await self
             .from("videos")
             .select()
             .order("created_at", ascending: false)
+            .range(from: offset, to: offset + limit - 1)
             .execute()
             .value
         
@@ -171,7 +172,7 @@ extension SupabaseClient {
     }
     
     // Load videos from users that current user follows
-    func loadFollowingVideos(currentUserId: UUID) async throws -> [Video] {
+    func loadFollowingVideos(currentUserId: UUID, limit: Int = 10, offset: Int = 0) async throws -> [Video] {
         let currentUserIdString = currentUserId.uuidString.lowercased()
         
         // Get list of users current user follows
@@ -179,6 +180,7 @@ extension SupabaseClient {
             .from("follows")
             .select()
             .eq("follower_id", value: currentUserIdString)
+            .eq("status", value: FollowStatus.accepted.rawValue)
             .execute()
             .value
         
@@ -188,12 +190,12 @@ extension SupabaseClient {
             return []
         }
         
-        // Get videos from followed users
         let videos: [Video] = try await self
             .from("videos")
             .select()
             .in("user_id", values: followingIds)
             .order("created_at", ascending: false)
+            .range(from: offset, to: offset + limit - 1)
             .execute()
             .value
         
