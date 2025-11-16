@@ -11,6 +11,7 @@ import AVKit
 struct VideoPlayerView: View {
     let video: Video
     @State private var player: AVPlayer?
+    @State private var showComments = false
     @SwiftUI.Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -42,7 +43,29 @@ struct VideoPlayerView: View {
                     .padding()
                 }
                 Spacer()
+                
+                // Comment button at bottom
+                HStack {
+                    Spacer()
+                    Button {
+                        showComments = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "bubble.left")
+                            Text("Comments")
+                        }
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding()
+                        .background(Color.black.opacity(0.6))
+                        .cornerRadius(10)
+                    }
+                    .padding()
+                }
             }
+        }
+        .sheet(isPresented: $showComments) {
+            CommentsListView(videoId: video.id)
         }
         .onAppear {
             setupPlayer()

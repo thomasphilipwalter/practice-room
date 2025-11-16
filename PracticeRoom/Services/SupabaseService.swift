@@ -97,12 +97,18 @@ extension SupabaseClient {
     func uploadAvatar(image: UIImage, userId: UUID) async throws -> String {
         // Compress image
         guard let imageData = image.jpegData(compressionQuality: 0.7) else {
-            throw NSError(domain: "ImageError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"])
+            throw NSError(
+                domain: "ImageError",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"]
+            )
         }
         
+        let lowercasedId = userId.uuidString.lowercased()
         let fileExtension = "jpg"
-        let fileName = "\(userId.uuidString).\(fileExtension)"
-        let filePath = "\(userId.uuidString)/\(fileName)"
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let fileName = "\(lowercasedId)_\(timestamp).\(fileExtension)"
+        let filePath = "\(lowercasedId)/\(fileName)"
         
         try await self.storage
             .from("avatars")
@@ -112,14 +118,14 @@ extension SupabaseClient {
                 options: FileOptions(
                     cacheControl: "3600",
                     contentType: "image/jpeg",
-                    upsert: true // allow overwriting existing data
+                    upsert: true
                 )
             )
-        
+
         let publicURL = try self.storage
             .from("avatars")
             .getPublicURL(path: filePath)
-        
+
         return publicURL.absoluteString
     }
     
@@ -365,5 +371,112 @@ extension SupabaseClient {
             .execute()
             .value
         return following.count
+    }
+    
+    private struct UsernameRow: Decodable {
+        let id: UUID
+        let username: String?
+    }
+
+    private func fetchUsernames(for ids: [UUID]) async throws -> [String] {
+        guard !ids.isEmpty else { return [] }
+        let idStrings = ids.map { $0.uuidString.lowercased() }
+
+        let rows: [UsernameRow] = try await self
+            .from("profiles")
+            .select("id, username")
+            .in("id", values: idStrings)
+            .order("username", ascending: true)
+            .execute()
+            .value
+
+        return rows.compactMap { $0.username }
+    }
+
+    func getFollowerUsernames(userId: UUID) async throws -> [String] {
+        let userIdString = userId.uuidString.lowercased()
+
+        struct FollowerIdRow: Decodable {
+            let followerId: String
+            enum CodingKeys: String, CodingKey { case followerId = "follower_id" }
+        }
+
+        let rows: [FollowerIdRow] = try await self
+            .from("follows")
+            .select("follower_id")
+            .eq("following_id", value: userIdString)
+            .eq("status", value: FollowStatus.accepted.rawValue)
+            .execute()
+            .value
+
+        let ids = rows.compactMap { UUID(uuidString: $0.followerId) }
+        return try await fetchUsernames(for: ids)
+    }
+
+    func getFollowingUsernames(userId: UUID) async throws -> [String] {
+        let userIdString = userId.uuidString.lowercased()
+
+        struct FollowingIdRow: Decodable {
+            let followingId: String
+            enum CodingKeys: String, CodingKey { case followingId = "following_id" }
+        }
+
+        let rows: [FollowingIdRow] = try await self
+            .from("follows")
+            .select("following_id")
+            .eq("follower_id", value: userIdString)
+            .eq("status", value: FollowStatus.accepted.rawValue)
+            .execute()
+            .value
+
+        let ids = rows.compactMap { UUID(uuidString: $0.followingId) }
+        return try await fetchUsernames(for: ids)
+    }
+    
+    // Create a comment on a video
+    func createComment(videoId: UUID, userId: UUID, goodThing: String, improvement: String?) async throws {
+        let commentInsert = CommentInsert(
+            videoId: videoId,
+            userId: userId,
+            goodThing: goodThing,
+            improvement: improvement
+        )
+        
+        try await self
+            .from("comments")
+            .insert(commentInsert)
+            .execute()
+    }
+    
+    // Load comments for a video with user profiles
+    func loadComments(videoId: UUID) async throws -> [CommentWithProfile] {
+        // First get comments
+        let comments: [Comment] = try await self
+            .from("comments")
+            .select()
+            .eq("video_id", value: videoId.uuidString.lowercased())
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+        
+        // Get unique user IDs
+        let userIds = Array(Set(comments.map { $0.userId }))
+        
+        // Fetch profiles for those users
+        var profiles: [UUID: Profile] = [:]
+        for userId in userIds {
+            do {
+                let profile = try await loadProfile(userId: userId)
+                profiles[userId] = profile
+            } catch {
+                print("Failed to load profile for user \(userId): \(error)")
+            }
+        }
+        
+        // Combine comments with profiles
+        return comments.compactMap { comment in
+            guard let profile = profiles[comment.userId] else { return nil }
+            return CommentWithProfile(id: comment.id, comment: comment, profile: profile)
+        }
     }
 }

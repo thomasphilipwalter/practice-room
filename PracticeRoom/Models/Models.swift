@@ -136,3 +136,41 @@ struct PendingFollowRequest: Identifiable {
     let followRequest: Follow
     let fromUserProfile: Profile
 }
+
+struct Comment: Identifiable, Codable {
+    let id: UUID
+    let videoId: UUID
+    let userId: UUID
+    let goodThing: String  // required
+    let improvement: String?  // optional
+    let createdAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case videoId = "video_id"
+        case userId = "user_id"
+        case goodThing = "good_thing"
+        case improvement
+        case createdAt = "created_at"
+    }
+}
+
+struct CommentInsert: Encodable {
+    let videoId: UUID
+    let userId: UUID
+    let goodThing: String
+    let improvement: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case videoId = "video_id"
+        case userId = "user_id"
+        case goodThing = "good_thing"
+        case improvement
+    }
+}
+
+struct CommentWithProfile: Identifiable {
+    let id: UUID
+    let comment: Comment
+    let profile: Profile
+}

@@ -15,6 +15,9 @@ struct UserProfileView: View {
     @StateObject private var authViewModel = AuthViewModel()
     @State private var selectedTab: Tab = .posts
     
+    @State private var showFollowersList = false
+    @State private var showFollowingList = false
+    
     enum Tab: String, CaseIterable, Identifiable {
         case posts = "Posts"
         case pieces = "Pieces"
@@ -104,25 +107,35 @@ struct UserProfileView: View {
                         }
                             
                         HStack(spacing: 16) {
-                            VStack(alignment: .leading) {
-                                Text("\(followViewModel.followerCount)")
-                                    .font(.custom("Merriweather-Regular", size: 18))
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.black)
-                                Text("Followers")
-                                    .font(.custom("Merriweather-Regular", size: 12))
-                                    .foregroundColor(.black)
+                            Button {
+                                showFollowersList = true
+                            } label: {
+                                VStack(alignment: .leading) {
+                                    Text("\(followViewModel.followerCount)")
+                                        .font(.custom("Merriweather-Regular", size: 18))
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.black)
+                                    Text("Followers")
+                                        .font(.custom("Merriweather-Regular", size: 12))
+                                        .foregroundColor(.black)
+                                }
                             }
-                            
-                            VStack(alignment: .leading) {
-                                Text("\(followViewModel.followingCount)")
-                                    .font(.custom("Merriweather-Regular", size: 18))
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.black)
-                                Text("Following")
-                                    .font(.custom("Merriweather-Regular", size: 12))
-                                    .foregroundColor(.black)
+                            .buttonStyle(.plain)
+
+                            Button {
+                                showFollowingList = true
+                            } label: {
+                                VStack(alignment: .leading) {
+                                    Text("\(followViewModel.followingCount)")
+                                        .font(.custom("Merriweather-Regular", size: 18))
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.black)
+                                    Text("Following")
+                                        .font(.custom("Merriweather-Regular", size: 12))
+                                        .foregroundColor(.black)
+                                }
                             }
+                            .buttonStyle(.plain)
                         }
                         .padding(.top, 4)
                             
@@ -172,29 +185,18 @@ struct UserProfileView: View {
                             .foregroundColor(.red)
                             .padding()
                     } else {
-                        Picker("Section", selection: $selectedTab) {
-                            Text("Posts").tag(Tab.posts)
-                                .font(.custom("Merriweather-Regular", size: 15))
-                            Text("Pieces").tag(Tab.pieces)
-                                .font(.custom("Merriweather-Regular", size: 15))
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        
-                        Group {
-                            switch selectedTab {
-                            case .posts:
-                                PostsListView(userId: userId)
-                            case .pieces:
-                                PiecesListView()
-                            }
-                        }
-                        .padding(.top, 12)
+                        PostsListView(userId: userId)
+                            .padding(.top, 12)
                     }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showFollowersList) {
+                FollowListView(userId: userId, mode: .followers)
+            }
+            .sheet(isPresented: $showFollowingList) {
+                FollowListView(userId: userId, mode: .following)
+            }
             .task {
                 await viewModel.loadProfile(userId: userId)
                 await followViewModel.loadFollowCounts(userId: userId)

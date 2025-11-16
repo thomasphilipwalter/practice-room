@@ -56,19 +56,20 @@ struct FriendsFeedView: View {
                         Image(systemName: "magnifyingglass")
                             .font(.title2)
                             .foregroundColor(.white)
-                            .padding(12)
-                            .background(Color.black.opacity(0.6))
+                            .padding(14)
+                            .background(Color.black.opacity(0.65))
                             .clipShape(Circle())
                             .shadow(radius: 4)
                     }
-                    .padding()
-                    .zIndex(1000)  // Ensure button is on top
+                    .padding(.trailing, 20)
+                    .padding(.top, 32)             // move it down below the notch
+                    .contentShape(Rectangle())     // enlarge tap target
+                    .zIndex(1000)
                 }
                 Spacer()
             }
-            .allowsHitTesting(true)  // Allow touches on overlay
+            .padding(.top, 8)                       // extra cushion
         }
-        .ignoresSafeArea(edges: .top)
         .sheet(isPresented: $showSearchView) {
             SearchView()
         }

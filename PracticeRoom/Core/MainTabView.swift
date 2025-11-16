@@ -26,7 +26,7 @@ struct MainTabView: View {
                 }
                 .tag(1)
             
-            UploadView()
+            UploadView(selectedTab: $selectedTab)
                 .tabItem {
                     Label("Upload", systemImage: "plus.circle.fill")
                 }

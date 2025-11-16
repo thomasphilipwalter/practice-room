@@ -9,6 +9,7 @@ import SwiftUI
 import PhotosUI
 
 struct UploadView: View {
+    @Binding var selectedTab: Int
     @StateObject private var videoViewModel = VideoViewModel()
     
     var body: some View {
@@ -77,16 +78,27 @@ struct UploadView: View {
             }
             .navigationTitle("Upload Video")
         }
-        .alert("Success!", isPresented: .constant(videoViewModel.successMessage != nil)) {
+        .alert(
+            "Success!",
+            isPresented: Binding(
+                get: { videoViewModel.successMessage != nil },
+                set: { if !$0 { videoViewModel.successMessage = nil } }
+            )
+        ) {
             Button("OK") {
                 videoViewModel.successMessage = nil
             }
         } message: {
             Text("Video uploaded successfully!")
         }
+        .onChange(of: videoViewModel.successMessage) { message in
+            guard message != nil else { return }
+            selectedTab = 4                      // switch to Profile tab
+            videoViewModel.successMessage = nil  // dismiss the alert automatically
+        }
     }
 }
 
 #Preview {
-    UploadView()
+    UploadView(selectedTab: .constant(2))
 }
