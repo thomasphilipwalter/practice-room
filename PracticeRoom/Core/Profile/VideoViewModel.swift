@@ -22,19 +22,38 @@ class VideoViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var successMessage: String?
     
+    // cache to track loaded user IDs (persist for app lifetime, NOTE: might want to change)
+    private var cachedUserId: UUID?
+    
     // Video upload props
     @Published var selectedVideo: PhotosPickerItem?
     @Published var videoTitle = ""
     @Published var videoDescription = ""
     @Published var showUploadSheet = false
     
-    func loadVideos(userId: UUID? = nil) async {
+    func loadVideos(userId: UUID? = nil, forceRefresh: Bool = false) async {
+        let currentUser = try? await supabase.getCurrentUser()
+        let targetUserId = userId ?? currentUser?.id
+        
+        guard let targetUserId = targetUserId else {
+            errorMessage = "Unable to determine user ID"
+            return
+        }
+        
+        // Check if we should use cache (only if same user and not forcing refresh)
+        let shouldUseCache = !forceRefresh &&
+            cachedUserId == targetUserId &&
+            !videos.isEmpty
+        
+        if shouldUseCache {
+            return // Use cached data - no network call needed
+        }
+        
         isLoading = true
         errorMessage = nil
         do {
-            let currentUser = try await supabase.getCurrentUser()
-            let targetUserId = userId ?? currentUser.id
             self.videos = try await supabase.loadVideos(userId: targetUserId)
+            self.cachedUserId = targetUserId
         } catch {
             errorMessage = "Failed to load videos: \(error.localizedDescription)"
         }
