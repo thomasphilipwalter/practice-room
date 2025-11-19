@@ -78,11 +78,18 @@ class UserProfileViewModel: ObservableObject {
                 isLoading = false
                 return
             }
+            
             var avatarUrl: String? = profile?.avatarUrl
-            // Upload new avatar if selected
             if let image = selectedImage {
-                avatarUrl = try await supabase.uploadAvatar(image: image, userId: userId)
+                // Compress image before upload
+                guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+                    errorMessage = "Failed to compress image"
+                    isLoading = false
+                    return
+                }
+                avatarUrl = try await supabase.uploadAvatar(imageData: imageData, userId: userId)
             }
+            
             try await supabase.updateProfile(
                 userId: userId,
                 params: UpdateProfileParams(

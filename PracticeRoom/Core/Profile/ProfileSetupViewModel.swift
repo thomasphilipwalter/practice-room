@@ -68,11 +68,19 @@ class ProfileSetupViewModel: ObservableObject {
                 return
             }
             let currentUser = try await supabase.getCurrentUser()
+            
             var avatarUrl: String? = nil
             // upload avatar if selected
             if let image = selectedImage {
-                avatarUrl = try await supabase.uploadAvatar(image: image, userId: currentUser.id)
+                // Compress image before upload
+                guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+                    errorMessage = "Failed to compress image"
+                    isLoading = false
+                    return
+                }
+                avatarUrl = try await supabase.uploadAvatar(imageData: imageData, userId: currentUser.id)
             }
+            
             // handle bio
             let bioValue = bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : bio
             // Build profile data

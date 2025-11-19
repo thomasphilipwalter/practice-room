@@ -1,12 +1,21 @@
+// Models.swift
 //
-//  Models.swift
-//  PracticeRoom
-//
-//  Created by Thomas Walter on 10/6/25.
-//
+// Purpose:
+// - Define application data models
+// - Define encoding usages
+//      - Encodable: Only sending this data to backend. Model is write-only from app's perspective.
+//      - Decodable: Only receiving this data from backend. Model is read-only from app's perspective.
+//      - Codable: Both send and receive this data from backend. Bidirectional and symmetric entity.
+//      - Identifiable: Track items in "List"s or "ForEach"s
+// - Convert Swift camel case to Supabase snake case
+// - "?" makes fields optional
 
 import Foundation
 
+// MARK: --------------- PROFILE MODELS ---------------
+
+/// Params for creating a new user profile during initial registration
+/// **Encodable** - only sent to backend when user first creates their profile
 struct ProfileSetupParams: Encodable {
     let id: String
     let username: String
@@ -25,6 +34,8 @@ struct ProfileSetupParams: Encodable {
     }
 }
 
+/// User profile data received from backend
+/// **Decodable & Identifiable** - read-only model for displaying profile info, used in SwiftUI lists
 struct Profile: Decodable, Identifiable {
     let id: UUID
     let username: String?
@@ -43,6 +54,8 @@ struct Profile: Decodable, Identifiable {
   }
 }
 
+/// Parameters for updating an existing user profile
+/// **Encodable** - sent to backend when user updates profile
 struct UpdateProfileParams: Encodable {
     let username: String
     let fullName: String
@@ -59,7 +72,11 @@ struct UpdateProfileParams: Encodable {
   }
 }
 
-struct Video: Identifiable, Codable {
+// MARK: --------------- VIDEO MODELS ---------------
+
+/// Video entity (metadata + storage Url) for user posts
+/// **Decodable & Identifiable** - read-only model received from backend, identifiable for feeds and profile grids
+struct Video: Identifiable, Decodable {
     let id: UUID
     let title: String
     let description: String?
@@ -79,6 +96,8 @@ struct Video: Identifiable, Codable {
     }
 }
 
+/// Video entity (metadata + storage Url) for user posts
+/// **Encodable** - used for sending video to backend. id, createdAt/updatedAt are generated automatically by Supabase
 struct VideoUpload: Encodable {
     let title: String
     let description: String?
@@ -93,7 +112,11 @@ struct VideoUpload: Encodable {
     }
 }
 
-struct Follow: Identifiable, Codable {
+// MARK: --------------- FOLLOW MODELS ---------------
+
+/// Follow relationship between two users
+/// **Decodable & Identifiable** - read-only model received from backend, used in follow lists
+struct Follow: Identifiable, Decodable {
     let id: UUID
     let followerId: UUID
     let followingId: UUID
@@ -115,6 +138,8 @@ enum FollowStatus: String, Codable {
     case rejected
 }
 
+/// Parameters for creating a new follow relationship
+/// **Encodable** - sent to backend on initial follow request
 struct FollowInsert: Encodable {
     let followerId: UUID
     let followingId: UUID
@@ -127,17 +152,25 @@ struct FollowInsert: Encodable {
     }
 }
 
+/// Parameters for updating a follow request status
+/// **Encodable** - sent to backend accepting/rejecting a follow request
 struct FollowUpdate: Encodable {
     let status: String
 }
 
+/// Composite structure for combine a follow request with the requester's profile. Not sent/received from backend.
+/// **Identifiable** - used in notifications lists
 struct PendingFollowRequest: Identifiable {
     let id: UUID
     let followRequest: Follow
     let fromUserProfile: Profile
 }
 
-struct Comment: Identifiable, Codable {
+// MARK: --------------- COMMENT MODELS ---------------
+
+/// Comment on a video with structured feedback
+/// **Decodable & Identifiable** - read-only model for fetching comments for a videoId
+struct Comment: Identifiable, Decodable {
     let id: UUID
     let videoId: UUID
     let userId: UUID
@@ -155,6 +188,8 @@ struct Comment: Identifiable, Codable {
     }
 }
 
+/// Parameters for creating a new comment on a video
+/// **Encodable** - sent to backend when user posts a comment
 struct CommentInsert: Encodable {
     let videoId: UUID
     let userId: UUID
@@ -169,6 +204,8 @@ struct CommentInsert: Encodable {
     }
 }
 
+/// Composit model combining a comment with the commenter's profile. Not sent/fetched from backend
+/// **Identifiable** - used in SwiftUI comment lists
 struct CommentWithProfile: Identifiable {
     let id: UUID
     let comment: Comment

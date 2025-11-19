@@ -1,9 +1,9 @@
+// SupabaseService.swift
 //
-//  SupabaseService.swift
-//  PracticeRoom
-//
-//  Created by Thomas Walter on 10/6/25.
-//
+// Purpose:
+// - Consolidate all calls to Supabase backend
+// - Creates client, adds custom methods
+// MARK: Pagination is implemented for loading feed videos, but not for loading comments, followers/following lists, or profile videos
 
 import Foundation
 import Supabase
@@ -17,36 +17,36 @@ let supabase = SupabaseClient(
 
 extension SupabaseClient {
     
-    // ------- AUTHENTICATION -------
+    // MARK: ---------------  AUTHENTICATION ---------------
     
-    // Sign in with magic link
+    /// Sign in with magic link
     func signInWithMagicLink(email: String) async throws {
         try await self.auth.signInWithOTP(email: email)
     }
     
-    // Handle magic link callback
+    /// Handle magic link callback
     func handleMagicLinkCallback(url: URL) async throws {
         try await self.auth.session(from: url)
     }
     
-    // Sign out current user
+    /// Sign out current user
     func signOut() async throws {
         try await self.auth.signOut()
     }
     
-    // Get current session
+    /// Get current session
     func getCurrentSession() async throws -> Session {
         return try await self.auth.session
     }
     
-    // Get current user
+    /// Get current user
     func getCurrentUser() async throws -> User {
         return try await self.auth.session.user
     }
     
-    // ------- PROFILE OPERATIONS -------
+    // MARK: --------------- PROFILE OPERATIONS ---------------
     
-    // Load profile by user ID
+    /// Load profile by user ID
     func loadProfile(userId: UUID) async throws -> Profile {
         let profile: Profile = try await self
             .from("profiles")
@@ -58,13 +58,14 @@ extension SupabaseClient {
         return profile
     }
     
-    // Check if username is available
+    /// Check if username is available, either during setup (nothing to exclude) or during username change (exclude old username)
     func checkUsernameAvailability(username: String, excluding userId: UUID? = nil) async throws -> Bool {
         var query = self
             .from("profiles")
             .select()
             .eq("username", value: username)
         
+        // If userId provided (i.e. username update), availability check should include current username
         if let userId = userId {
             query = query.neq("id", value: userId)
         }
@@ -76,7 +77,7 @@ extension SupabaseClient {
         return profiles.isEmpty
     }
     
-    // Update profile
+    /// Update profile (works only if userId already in profile table), use for profile updates post setup/registration
     func updateProfile(userId: UUID, params: UpdateProfileParams) async throws {
         try await self
             .from("profiles")
@@ -85,7 +86,7 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Setup/upsert profile
+    /// Setup/upsert profile (use during setup)
     func upsertProfile(params: ProfileSetupParams) async throws {
         try await self
             .from("profiles")
@@ -93,17 +94,12 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Upload avatar image to storage and return public URL
-    func uploadAvatar(image: UIImage, userId: UUID) async throws -> String {
-        // Compress image
-        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
-            throw NSError(
-                domain: "ImageError",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"]
-            )
-        }
-        
+    /// Upload avatar image to storage and return public URL
+    /// - Generate unique id
+    /// - uplaod to supabase storage
+    /// - Assumes already compressed in viewModel
+    func uploadAvatar(imageData: Data, userId: UUID) async throws -> String {
+        // Generate unique file path
         let lowercasedId = userId.uuidString.lowercased()
         let fileExtension = "jpg"
         let timestamp = ISO8601DateFormatter().string(from: Date())
@@ -116,12 +112,13 @@ extension SupabaseClient {
                 filePath,
                 data: imageData,
                 options: FileOptions(
-                    cacheControl: "3600",
+                    cacheControl: "3600", // Cache for 1 hour
                     contentType: "image/jpeg",
                     upsert: true
                 )
             )
-
+        
+        // Get the public url
         let publicURL = try self.storage
             .from("avatars")
             .getPublicURL(path: filePath)
@@ -129,21 +126,22 @@ extension SupabaseClient {
         return publicURL.absoluteString
     }
     
-    // Search users by username pattern
+    /// Search for user profile
     func searchUsers(query: String, excludingUserId: UUID) async throws -> [Profile] {
         let results: [Profile] = try await self
             .from("profiles")
             .select()
-            .ilike("username", pattern: "%\(query)%")
-            .neq("id", value: excludingUserId)
+            .ilike("username", pattern: "%\(query)%") // search case-insensitive and placement agnostic
+            .neq("id", value: excludingUserId) // exclude a user (i.e. your own)
             .execute()
             .value
         return results
     }
     
-    // ------- VIDEO OPERATIONS -------
+    // MARK: --------------- VIDEO OPERATIONS ---------------
     
-    // Load videos for a specific user
+    /// Load videos for a specific user
+    // MARK: NO PAGINATION FOR PROFILE VIDEOS
     func loadVideos(userId: UUID) async throws -> [Video] {
         let userIdString = userId.uuidString.lowercased()
         
@@ -158,12 +156,14 @@ extension SupabaseClient {
         return videos
     }
     
-    // Load all videos (for global feed)
+    /// Fetch 10 videos from global feed
+    /// - Fetch 10 at a time
+    /// - Start at offset 'offset' (for pagination)
     func loadAllVideos(limit: Int = 10, offset: Int = 0) async throws -> [Video] {
         let videos: [Video] = try await self
             .from("videos")
             .select()
-            .order("created_at", ascending: false)
+            .order("created_at", ascending: false) // Sort newest first
             .range(from: offset, to: offset + limit - 1)
             .execute()
             .value
@@ -171,7 +171,9 @@ extension SupabaseClient {
         return videos
     }
     
-    // Load videos from users that current user follows
+    /// Fetch 10 videos from followers feed
+    /// - Fetch 10 at a time
+    /// - Start at offset 'offset' (for pagination)
     func loadFollowingVideos(currentUserId: UUID, limit: Int = 10, offset: Int = 0) async throws -> [Video] {
         let currentUserIdString = currentUserId.uuidString.lowercased()
         
@@ -184,6 +186,7 @@ extension SupabaseClient {
             .execute()
             .value
         
+        // array of user ids being followed by current user
         let followingIds = follows.map { $0.followingId.uuidString.lowercased() }
         
         guard !followingIds.isEmpty else {
@@ -202,7 +205,8 @@ extension SupabaseClient {
         return videos
     }
     
-    // Upload video to storage and save metadata to database
+    /// Upload video to storage and save metadata to database
+    /// - Assumes already compressed
     func uploadVideo(
         videoData: Data,
         userId: UUID,
@@ -241,7 +245,8 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Delete video from database
+    /// Delete video from database
+    /// - NOTE: Only deletes metadata, not actual file
     func deleteVideo(videoId: UUID) async throws {
         try await self
             .from("videos")
@@ -250,9 +255,9 @@ extension SupabaseClient {
             .execute()
     }
     
-    // ------- FOLOW OPERATIONS -------
+    // MARK: --------------- FOLOW OPERATIONS ---------------
     
-    // Send a follow request (creates pending row)
+    /// Send a NEW follow request
     func sendFollowRequest(followerId: UUID, followingId: UUID) async throws {
         // Prevent duplicates
         let existing: [Follow] = try await self
@@ -264,7 +269,6 @@ extension SupabaseClient {
             .value
         
         if !existing.isEmpty {
-            // If it already exists, do nothing or throw depending on your preference
             throw NSError(
                 domain: "FollowError",
                 code: -1,
@@ -284,7 +288,7 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Accept a follow request (set status = accepted)
+    /// Accept a follow request (set status = accepted)
     func acceptFollowRequest(followId: UUID) async throws {
         try await self
             .from("follows")
@@ -293,7 +297,7 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Reject a follow request (set status = rejected)
+    /// Reject a follow request (set status = rejected)
     func rejectFollowRequest(followId: UUID) async throws {
         try await self
             .from("follows")
@@ -302,7 +306,7 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Cancel a pending follow request you sent
+    /// Cancel a pending follow request you sent
     func cancelFollowRequest(followerId: UUID, followingId: UUID) async throws {
         try await self
             .from("follows")
@@ -313,7 +317,7 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Unfollow (remove accepted follow)
+    /// Unfollow (remove accepted follow)
     func unfollowUser(followerId: UUID, followingId: UUID) async throws {
         try await self
             .from("follows")
@@ -323,7 +327,7 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Get follow status between two users (nil if no row)
+    /// Get follow status between two users (nil if no row)
     func getFollowStatus(followerId: UUID, followingId: UUID) async throws -> FollowStatus? {
         let follows: [Follow] = try await self
             .from("follows")
@@ -335,7 +339,7 @@ extension SupabaseClient {
         return follows.first?.status
     }
     
-    // Get pending follow requests for a user (they are the target/following)
+    /// Get pending follow requests for a user (they are the target/following)
     func getPendingFollowRequests(userId: UUID) async throws -> [Follow] {
         let userIdString = userId.uuidString.lowercased()
         let pending: [Follow] = try await self
@@ -349,7 +353,7 @@ extension SupabaseClient {
         return pending
     }
     
-    // Get follower count for a user (accepted only)
+    /// Get follower count for a user (accepted only)
     func getFollowerCount(userId: UUID) async throws -> Int {
         let userIdString = userId.uuidString.lowercased()
         let followers: [Follow] = try await self
@@ -362,7 +366,7 @@ extension SupabaseClient {
         return followers.count
     }
     
-    // Get following count for a user (accepted only)
+    /// Get following count for a user (accepted only)
     func getFollowingCount(userId: UUID) async throws -> Int {
         let userIdString = userId.uuidString.lowercased()
         let following: [Follow] = try await self
@@ -375,11 +379,13 @@ extension SupabaseClient {
         return following.count
     }
     
+    /// Minimal struct to decode only id and username
     private struct UsernameRow: Decodable {
         let id: UUID
         let username: String?
     }
-
+    
+    /// Returns list of usernames from a list of ids
     private func fetchUsernames(for ids: [UUID]) async throws -> [String] {
         guard !ids.isEmpty else { return [] }
         let idStrings = ids.map { $0.uuidString.lowercased() }
@@ -392,9 +398,12 @@ extension SupabaseClient {
             .execute()
             .value
 
-        return rows.compactMap { $0.username }
+        return rows.compactMap { $0.username } // extract just usernames
     }
-
+    
+    /// Get the list of usernames that **follow** the specific user
+    /// Returns a **list of usernames**
+    // MARK: NO PAGINATION FOR VIDEO COMMENTS, SHOULD HAVE PAGINATION
     func getFollowerUsernames(userId: UUID) async throws -> [String] {
         let userIdString = userId.uuidString.lowercased()
 
@@ -414,7 +423,10 @@ extension SupabaseClient {
         let ids = rows.compactMap { UUID(uuidString: $0.followerId) }
         return try await fetchUsernames(for: ids)
     }
-
+    
+    /// Get the list of usernames are **followed by** the specific user
+    /// Returns a **list of usernames**
+    // MARK: NO PAGINATION FOR VIDEO COMMENTS, SHOULD HAVE PAGINATION
     func getFollowingUsernames(userId: UUID) async throws -> [String] {
         let userIdString = userId.uuidString.lowercased()
 
@@ -435,7 +447,9 @@ extension SupabaseClient {
         return try await fetchUsernames(for: ids)
     }
     
-    // Create a comment on a video
+    // MARK: --------------- COMMENT OPERATIONS ---------------
+    
+    /// Create a comment on a video
     func createComment(videoId: UUID, userId: UUID, goodThing: String, improvement: String?) async throws {
         let commentInsert = CommentInsert(
             videoId: videoId,
@@ -450,7 +464,8 @@ extension SupabaseClient {
             .execute()
     }
     
-    // Load comments for a video with user profiles
+    /// Load the comments of a video with associated profiless
+    // MARK: NO PAGINATION FOR VIDEO COMMENTS, SHOULD HAVE PAGINATION
     func loadComments(videoId: UUID) async throws -> [CommentWithProfile] {
         // First get comments
         let comments: [Comment] = try await self
